@@ -14,7 +14,7 @@ class IngredientController extends Controller
      */
     public function index()
     {
-        $ingredients = Ingredient::latest()->paginate(10);
+        $ingredients = Ingredient::latest()->get();
 
         return response()->json([
             'success' => true,

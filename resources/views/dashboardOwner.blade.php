@@ -6,7 +6,7 @@
     <title>Dashboard Owner</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -140,6 +140,11 @@
                         <i class="fas fa-box"></i>Manajemen Bahan Baku
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#" data-section="saldo-management">
+                        <i class="fas fa-money-bills"></i>Saldo
+                    </a>
+                </li>
             </ul>
             <div class="logout-btn-container mt-auto">
                 <button id="logout-btn" class="btn btn-brown w-100">
@@ -251,9 +256,10 @@
                             </div>
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <h5 id="report-period-title">Data Penjualan</h5>
-                                <button class="btn btn-sm btn-outline-secondary">
+                                <button class="btn btn-sm btn-outline-secondary" onclick="exportPDF()">
                                     <i class="fas fa-file-pdf me-1"></i> Export PDF
                                 </button>
+
                             </div>
                             <div class="table-responsive">
                                 <table class="table table-striped table-hover">
@@ -309,11 +315,44 @@
                 <div id="employee-management" class="content-section">
                     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                         <h1>Manajemen Karyawan</h1>
-                        <button class="btn btn-brown">
+                        <button class="btn btn-brown" data-bs-toggle="modal" data-bs-target="#addKaryawanModal">
                             <i class="fas fa-plus me-1"></i> Tambah Karyawan
                         </button>
+                        
+                    </div>
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header">
+                            Daftar Karyawan
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover table-striped">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th scope="col">Nama</th>
+                                            <th scope="col">Email</th>
+                                            <th scope="col">Role</th>
+                                            <th scope="col" class="text-center">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="karyawan-table-body">
+                                        <tr>
+                                            <td colspan="4" class="text-center text-muted">
+                                                Memuat data...
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <nav aria-label="Karyawan pagination" class="mt-3">
+                                <ul class="pagination justify-content-center" id="karyawanPagination">
+                                    </ul>
+                            </nav>
+                        </div>
                     </div>
                 </div>
+
+                
 
                 <div id="inventory-management" class="content-section">
                     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
@@ -346,6 +385,10 @@
                                     </tbody>
                                 </table>
                             </div>
+                            <nav aria-label="Bahan pagination" class="mt-3">
+                                <ul class="pagination justify-content-center" id="bahanPagination">
+                                    </ul>
+                            </nav>
                         </div>
                     </div>
                     <div class="card shadow-sm">
@@ -376,8 +419,164 @@
                         </div>
                     </div>
                 </div>
+
+
+            <div id="saldo-management" class="content-section">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1>Manajemen Saldo</h1>
+                        <button class="btn btn-brown" id="add-balance-btn" data-bs-toggle="modal" data-bs-target="#addBalanceModal">
+                            <i class="fas fa-plus me-1"></i> Tambah Saldo
+                        </button>
+                    </div>
+
+                    <!-- Kartu untuk menampilkan saldo -->
+                    <div class="card balance-card border-0 shadow-sm mb-4">
+                        <div class="card-body text-center p-4">
+                            <h6 class="card-subtitle mb-2 text-black-50">SALDO SAAT INI</h6>
+                            <p class="card-title balance-value" id="current-balance">Memuat...</p>
+                            <small class="text-black-50">Diperbarui dari server</small>
+                        </div>
+                    </div>
+                    
+                    <!-- Tabel Riwayat Saldo -->
+                    <h3 class="mt-5">Riwayat Saldo</h3>
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th scope="col">Tanggal</th>
+                                    <th scope="col">Keterangan</th>
+                                    <th scope="col">Jenis</th>
+                                    <th scope="col" class="text-end">Jumlah</th>
+                                </tr>
+                            </thead>
+                            <tbody id="history-table-body">
+                                <!-- Data riwayat akan dimasukkan di sini oleh JavaScript -->
+                            </tbody>
+                        </table>
+                        <div class="mt-3 text-center" id="history-pagination"></div>
+                        <div id="history-loader" class="text-center p-4">
+                            <div class="spinner-border text-brown" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
             </div>
         </main>
+    </div>
+
+
+    <!-- Modal Tambah Karyawan -->
+<div class="modal fade" id="addKaryawanModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form id="addKaryawanForm">
+        <div class="modal-header">
+          <h5 class="modal-title">Tambah Karyawan</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="name" class="form-label">Nama</label>
+            <input type="text" class="form-control" id="name" name="name" required>
+          </div>
+          <div class="mb-3">
+            <label for="email" class="form-label">Email</label>
+            <input type="email" class="form-control" id="email" name="email" required>
+          </div>
+          <div class="mb-3">
+            <label for="password" class="form-label">Password</label>
+            <input type="password" class="form-control" id="password" name="password" required>
+          </div>
+          <div class="mb-3">
+            <label for="role_id" class="form-label">Role</label>
+            <select id="role_id" name="role_id" class="form-select" required>
+              <option value="">Memuat...</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-brown">Simpan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Edit Karyawan -->
+<div class="modal fade" id="editKaryawanModal" tabindex="-1" aria-labelledby="editKaryawanModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="editKaryawanModalLabel">Edit Karyawan</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="editKaryawanForm">
+          <input type="hidden" id="editId">
+
+          <div class="mb-3">
+            <label for="editName" class="form-label">Nama</label>
+            <input type="text" class="form-control" id="editName" required>
+          </div>
+
+          <div class="mb-3">
+            <label for="editEmail" class="form-label">Email</label>
+            <input type="email" class="form-control" id="editEmail" required>
+          </div>
+
+          <div class="mb-3">
+            <label for="editRole" class="form-label">Role</label>
+            <select class="form-select" id="editRole" required>
+              <option value="">-- Pilih Role --</option>
+              <option value="1">Owner</option>
+              <option value="2">Kasir</option>
+              <option value="3">Koki</option>
+              <!-- tambahkan role lain sesuai database -->
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label for="editPassword" class="form-label">Password (opsional)</label>
+            <input type="password" class="form-control" id="editPassword">
+          </div>
+
+          <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+    <div class="modal fade" id="addBalanceModal" tabindex="-1" aria-labelledby="addBalanceLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+        <form id="addBalanceForm">
+            <div class="modal-header">
+            <h5 class="modal-title" id="addBalanceLabel">Tambah Saldo</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+            </div>
+            <div class="modal-body">
+            <div class="mb-3">
+                <label for="amount" class="form-label">Jumlah Saldo</label>
+                <input type="number" class="form-control" id="amount" name="amount" required min="1">
+            </div>
+            <div class="mb-3">
+                <label for="reason" class="form-label">Alasan</label>
+                <input type="text" class="form-control" id="reason" name="reason" required maxlength="255">
+            </div>
+            </div>
+            <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+            <button type="submit" class="btn btn-brown">Simpan</button>
+            </div>
+        </form>
+        </div>
+    </div>
     </div>
 
     <div class="modal fade" id="addBahanModal" tabindex="-1" aria-labelledby="addBahanModalLabel" aria-hidden="true">
@@ -451,6 +650,49 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
                     <button type="button" class="btn btn-primary" id="simpan-btn">Simpan</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+     <div class="modal fade" id="addProductModal" tabindex="-1" aria-labelledby="addProductModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addProductModalLabel">Tambah Produk</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addProductForm">
+                        <input type="hidden" id="addProductId">
+                        <div class="mb-3">
+                            <label for="addProductName" class="form-label">Nama Produk</label>
+                            <input type="text" class="form-control" id="addProductName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="addProductDescription" class="form-label">Deskripsi</label>
+                            <textarea class="form-control" id="addProductDescription"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="addProductPrice" class="form-label">Harga</label>
+                            <input type="number" class="form-control" id="addProductPrice" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="addProductCategory" class="form-label">Kategori</label>
+                            <select class="form-select" id="addProductCategory"></select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="addProductStatus" class="form-label">Status</label>
+                            <select class="form-select" id="addProductStatus">
+                                <option value="1">Tersedia</option>
+                                <option value="0">Tidak Tersedia</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="button" class="btn btn-primary" id="add-simpan-btn">Simpan</button>
                 </div>
             </div>
         </div>
@@ -543,24 +785,39 @@
                 }
             });
         });
+
+        function getCookie(name) {
+                        const value = `; ${document.cookie}`;
+                        const parts = value.split(`; ${name}=`);
+                        if (parts.length === 2) return parts.pop().split(';').shift();
+                        return null; // Kembalikan null jika tidak ditemukan
+                    }
+                    function buildHeaders(json = true) {
+                        const headers = {
+                            "Accept": "application/json"
+                        };
+                        if (json) headers["Content-Type"] = "application/json";
+
+                        const xsrfToken = getCookie('XSRF-TOKEN');
+                        if (xsrfToken) {
+                            headers["X-XSRF-TOKEN"] = decodeURIComponent(xsrfToken);
+                        }
+                        return headers;
+                    }
     </script>
 
     <script>
-        // ===========================================
-        // SCRIPT DASHBOARD OVERVIEW
-        // ===========================================
         let salesChart, productChart;
 
         async function loadDashboardData() {
             const apiUrl = "/api/dashboard-overview";
-            const token = localStorage.getItem("token");
-
+            
             try {
                 const response = await fetch(apiUrl, {
                     method: 'GET',
+                    credentials: 'include',
                     headers: {
-                        'Accept': 'application/json',
-                        'Authorization': 'Bearer ' + token
+                        'Accept': 'application/json'
                     }
                 });
 
@@ -572,6 +829,8 @@
 
                 if (responseData.success) {
                     const data = responseData.data;
+
+                    // Update UI
                     document.getElementById("sales-today-value").innerText = "Rp " + data.overview.sales_today.value.toLocaleString('id-ID');
                     document.getElementById("sales-today-change").innerText = data.overview.sales_today.percentage_change + "% dari kemarin";
                     document.getElementById("transactions-today-value").innerText = data.overview.transactions_today.count;
@@ -582,9 +841,11 @@
                         document.getElementById("top-product-qty").innerText = data.overview.top_product_today.quantity_sold + " porsi terjual";
                     }
 
+                    // Hapus chart lama jika ada
                     if (salesChart) salesChart.destroy();
                     if (productChart) productChart.destroy();
 
+                    // Buat chart baru
                     const salesCtx = document.getElementById("salesChart").getContext("2d");
                     salesChart = new Chart(salesCtx, {
                         type: "line",
@@ -599,14 +860,7 @@
                                 tension: 0.3
                             }]
                         },
-                        options: {
-                            responsive: true,
-                            plugins: {
-                                legend: {
-                                    display: false
-                                }
-                            }
-                        }
+                        options: { responsive: true, plugins: { legend: { display: false } } }
                     });
 
                     const productCtx = document.getElementById("productChart").getContext("2d");
@@ -619,39 +873,52 @@
                                 backgroundColor: ["#4B2E2B", "#A0522D", "#D2B48C", "#F5F3ED", "#8B4513"]
                             }]
                         },
-                        options: {
-                            responsive: true,
-                            plugins: {
-                                legend: {
-                                    position: "bottom"
-                                }
-                            }
-                        }
+                        options: { responsive: true, plugins: { legend: { position: "bottom" } } }
                     });
                 }
+
             } catch (error) {
                 console.error("Gagal ambil data dashboard:", error);
                 alert("Tidak bisa memuat dashboard. Silakan login ulang.");
-                window.location.href = "/";
+                window.location.href = '/';
+             
             }
         }
+
+        // Panggil saat page load
+        document.addEventListener("DOMContentLoaded", loadDashboardData);
     </script>
+
     
     <script>
-        // ===========================================
-        // SCRIPT MANAJEMEN PRODUK
-        // ===========================================
+        
         const productsTableBody = document.getElementById('productsTableBody');
         const productsPagination = document.getElementById('productsPagination');
         const ITEMS_PER_PAGE = 10;
         let allProducts = [];
         let currentPage = 1;
 
+        // wrapper fetch supaya gampang
+        async function apiFetch(url, options = {}) {
+            const defaultOptions = {
+                headers: {
+                    "Content-Type": "application/json",
+                    "Accept": "application/json"
+                },
+                credentials: "include" // penting biar cookie HttpOnly ikut terkirim
+            };
+            const res = await fetch(url, { ...defaultOptions, ...options });
+            if (!res.ok) {
+                throw new Error(`HTTP error ${res.status}`);
+            }
+            return res.json();
+        }
+
         async function fetchProducts() {
             try {
-                const response = await axios.get('/api/products');
-                allProducts = response.data.products;
-                if (!allProducts || allProducts.length === 0) {
+                const data = await apiFetch('/api/products');
+                allProducts = data.products || [];
+                if (allProducts.length === 0) {
                     productsTableBody.innerHTML = `<tr><td colspan="6" class="text-center">Belum ada produk.</td></tr>`;
                     productsPagination.innerHTML = '';
                     return;
@@ -664,7 +931,7 @@
                 productsPagination.innerHTML = '';
             }
         }
-        
+
         function renderProductsTable(products, page) {
             productsTableBody.innerHTML = '';
             const start = (page - 1) * ITEMS_PER_PAGE;
@@ -688,7 +955,7 @@
                 productsTableBody.appendChild(tr);
             });
         }
-        
+
         function setupPagination(products) {
             productsPagination.innerHTML = '';
             const pageCount = Math.ceil(products.length / ITEMS_PER_PAGE);
@@ -723,31 +990,31 @@
             productsPagination.appendChild(createPageItem('&raquo;', currentPage + 1, false, currentPage === pageCount));
         }
 
-        function editProduct(id) {
-            axios.get(`/api/products/${id}`)
-                .then(res => {
-                    const prod = res.data.product;
-                    document.getElementById("editProductId").value = prod.id;
-                    document.getElementById("editProductName").value = prod.name;
-                    document.getElementById("editProductDescription").value = prod.description ?? '';
-                    document.getElementById("editProductPrice").value = prod.price;
-                    document.getElementById("editProductCategory").value = prod.category?.id_categories ?? '';
-                    document.getElementById("editProductStatus").value = prod.is_available ? '1' : '0';
-                })
-                .catch(err => console.error("Gagal ambil data produk:", err));
+        async function editProduct(id) {
+            try {
+                const data = await apiFetch(`/api/products/${id}`);
+                const prod = data.product;
+                document.getElementById("editProductId").value = prod.id;
+                document.getElementById("editProductName").value = prod.name;
+                document.getElementById("editProductDescription").value = prod.description ?? '';
+                document.getElementById("editProductPrice").value = prod.price;
+                document.getElementById("editProductCategory").value = prod.category?.id_categories ?? '';
+                document.getElementById("editProductStatus").value = prod.is_available ? '1' : '0';
+            } catch (err) {
+                console.error("Gagal ambil data produk:", err);
+            }
         }
 
-        function deleteProduct(id) {
+        async function deleteProduct(id) {
             if (!confirm('Apakah Anda yakin ingin menghapus produk ini?')) return;
-            axios.delete(`/api/products/${id}`)
-                .then(response => {
-                    alert(response.data.message || 'Produk berhasil dihapus!');
-                    fetchProducts();
-                })
-                .catch(error => {
-                    console.error('Gagal menghapus produk:', error);
-                    alert('Gagal menghapus produk.');
-                });
+            try {
+                const response = await apiFetch(`/api/products/${id}`, { method: "DELETE" });
+                alert(response.message || 'Produk berhasil dihapus!');
+                fetchProducts();
+            } catch (error) {
+                console.error('Gagal menghapus produk:', error);
+                alert('Gagal menghapus produk.');
+            }
         }
 
         document.getElementById('simpan-btn').addEventListener('click', async function(e) {
@@ -762,25 +1029,20 @@
             };
             if (!confirm('Apakah Anda yakin ingin menyimpan perubahan ini?')) return;
             try {
-                const response = await axios.put(`/api/products/${productId}`, payload);
-                if (response.data.message) {
-                    alert(response.data.message);
+                const response = await apiFetch(`/api/products/${productId}`, {
+                    method: "PUT",
+                    body: JSON.stringify(payload),
+                    credentials: "include"
+                });
+                if (response.message) {
+                    alert(response.message);
                     const modal = bootstrap.Modal.getInstance(document.getElementById('editProductModal'));
                     modal.hide();
                     fetchProducts();
                 }
             } catch (error) {
                 console.error("Gagal update produk:", error);
-                if (error.response?.status === 422) {
-                    const validationErrors = error.response.data.errors;
-                    let errorMessages = "Harap perbaiki kesalahan berikut:\n";
-                    for (const field in validationErrors) {
-                        errorMessages += `- ${validationErrors[field].join(', ')}\n`;
-                    }
-                    alert(errorMessages);
-                } else {
-                    alert('Terjadi kesalahan saat menyimpan perubahan.');
-                }
+                alert('Terjadi kesalahan saat menyimpan perubahan.');
             }
         });
 
@@ -794,25 +1056,20 @@
                 is_available: document.getElementById('addProductStatus').value === '1'
             };
             try {
-                const response = await axios.post('/api/products', payload);
-                if (response.data.message) {
-                    alert(response.data.message);
+                const response = await apiFetch('/api/products', {
+                    method: "POST",
+                    body: JSON.stringify(payload),
+                    credentials: "include"
+                });
+                if (response.message) {
+                    alert(response.message);
                     const modal = bootstrap.Modal.getInstance(document.getElementById('addProductModal'));
                     modal.hide();
                     fetchProducts();
                 }
             } catch (error) {
                 console.error("Gagal tambah produk:", error);
-                if (error.response?.status === 422) {
-                    const validationErrors = error.response.data.errors;
-                    let errorMessages = "Harap perbaiki kesalahan berikut:\n";
-                    for (const field in validationErrors) {
-                        errorMessages += `- ${validationErrors[field].join(', ')}\n`;
-                    }
-                    alert(errorMessages);
-                } else {
-                    alert('Terjadi kesalahan saat menambah produk.');
-                }
+                alert('Terjadi kesalahan saat menambah produk.');
             }
         });
 
@@ -820,9 +1077,9 @@
             const selectElement = document.getElementById(selectElementId);
             if (!selectElement) return console.error(`Elemen dropdown dengan ID "${selectElementId}" tidak ditemukan.`);
             try {
-                const response = await axios.get('/api/categories');
-                if (response.data.success) {
-                    const categories = response.data.categories;
+                const response = await apiFetch('/api/categories');
+                if (response.success) {
+                    const categories = response.categories;
                     selectElement.innerHTML = '';
                     const defaultOption = document.createElement('option');
                     defaultOption.value = '';
@@ -841,6 +1098,7 @@
             }
         }
     </script>
+
 
     <script>
         // ===========================================
@@ -991,8 +1249,9 @@
         // SCRIPT MANAJEMEN BAHAN BAKU
         // ===========================================
         const API_URL = "/api/ingredients";
-        const PURCHASE_API = "/api/purchases";
+        const PURCHASE_API = "api/purchases";
         const inventoryTableBody = document.getElementById("inventory-table-body");
+        const bahanPagination = document.getElementById('bahanPagination');
         const saveBahanBtn = document.getElementById("saveBahanBtn");
         const addBahanErrors = document.getElementById("addBahanErrors");
         const beliModalEl = document.getElementById("beliBahanModal");
@@ -1003,6 +1262,12 @@
         const beliIngredientId = document.getElementById("beliIngredientId");
         const csrfMeta = document.querySelector('meta[name="csrf-token"]');
         const CSRF_META = csrfMeta ? csrfMeta.content : null;
+
+        // --- BARU: Variabel untuk state paginasi ---
+        const BAHAN_ITEMS_PER_PAGE = 10; // Tampilkan 5 item per halaman
+        let allIngredients = []; // Menyimpan semua data bahan baku
+        let currentBahanPage = 1; // Halaman aktif saat ini
+        // --- END BARU ---
 
         function getCookie(name) {
             const cookies = document.cookie ? document.cookie.split('; ') : [];
@@ -1026,7 +1291,88 @@
             }
             return headers;
         }
+        
+        // --- BARU: Fungsi untuk merender tabel berdasarkan halaman ---
+        function renderIngredientsTable(page) {
+            inventoryTableBody.innerHTML = "";
+            currentBahanPage = page;
+            
+            const start = (page - 1) * BAHAN_ITEMS_PER_PAGE;
+            const end = start + BAHAN_ITEMS_PER_PAGE;
+            const paginatedIngredients = allIngredients.slice(start, end);
 
+            paginatedIngredients.forEach(ing => {
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+                    <td>${ing.name}</td>
+                    <td>${ing.current_stock}</td>
+                    <td>${ing.unit}</td>
+                    <td class="text-center">
+                        <button class="btn btn-sm btn-success me-1" onclick="openBeliModal(${ing.id})">Beli</button>
+                        <button class="btn btn-sm btn-warning me-1 edit-btn" data-id="${ing.id}">Edit</button>
+                        <button class="btn btn-sm btn-danger hapus-btn" data-id="${ing.id}">Hapus</button>
+                    </td>
+                `;
+                inventoryTableBody.appendChild(tr);
+            });
+            
+            // Pindahkan event listener ke sini agar selalu terpasang setelah render
+             document.querySelectorAll(".hapus-btn").forEach(btn => {
+                btn.addEventListener("click", async e => {
+                    const id = e.currentTarget.dataset.id;
+                    if (confirm("Yakin ingin menghapus bahan ini?")) {
+                        await deleteIngredient(id);
+                    }
+                });
+            });
+            document.querySelectorAll(".edit-btn").forEach(btn => {
+                btn.addEventListener("click", async e => {
+                    const id = e.currentTarget.dataset.id;
+                    const qtyStr = prompt("Masukkan jumlah yang ingin dikurangi (angka):");
+                    const qty = parseFloat(qtyStr);
+                    if (!isNaN(qty) && qty > 0) await editIngredient(id, qty);
+                    else alert("Jumlah tidak valid.");
+                });
+            });
+        }
+        // --- END BARU ---
+
+        // --- BARU: Fungsi untuk membuat kontrol paginasi ---
+        function setupBahanPagination() {
+            bahanPagination.innerHTML = '';
+            const pageCount = Math.ceil(allIngredients.length / BAHAN_ITEMS_PER_PAGE);
+
+            if (pageCount <= 1) return; // Tidak perlu paginasi jika hanya 1 halaman
+
+            const createPageItem = (text, page, isActive = false, isDisabled = false) => {
+                const li = document.createElement('li');
+                li.className = `page-item ${isActive ? 'active' : ''} ${isDisabled ? 'disabled' : ''}`;
+                const a = document.createElement('a');
+                a.className = 'page-link';
+                a.href = '#';
+                a.innerHTML = text;
+                a.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    if (!isDisabled) {
+                        renderIngredientsTable(page);
+                        setupBahanPagination(); // Re-render paginasi untuk update status active
+                    }
+                });
+                li.appendChild(a);
+                return li;
+            };
+
+            bahanPagination.appendChild(createPageItem('&laquo;', currentBahanPage - 1, false, currentBahanPage === 1));
+
+            for (let i = 1; i <= pageCount; i++) {
+                bahanPagination.appendChild(createPageItem(i, i, i === currentBahanPage));
+            }
+
+            bahanPagination.appendChild(createPageItem('&raquo;', currentBahanPage + 1, false, currentBahanPage === pageCount));
+        }
+        // --- END BARU ---
+
+        // --- MODIFIKASI: Fungsi loadIngredients diubah untuk menangani paginasi ---
         async function loadIngredients() {
             if (!inventoryTableBody) return;
             inventoryTableBody.innerHTML = `<tr><td colspan="4" class="text-center text-muted">Memuat data...</td></tr>`;
@@ -1036,48 +1382,26 @@
                 });
                 const result = await res.json();
                 if (!res.ok) throw new Error(result.message || "Gagal memuat data");
-                const ingredients = result.data?.data ?? result.data ?? [];
-                if (!ingredients.length) {
+                
+                // Simpan semua data ke variabel global
+                allIngredients = result.data?.data ?? result.data ?? [];
+                
+                if (!allIngredients.length) {
                     inventoryTableBody.innerHTML = `<tr><td colspan="4" class="text-center text-muted">Belum ada data</td></tr>`;
+                    bahanPagination.innerHTML = ''; // Kosongkan paginasi
                     return;
                 }
-                inventoryTableBody.innerHTML = "";
-                ingredients.forEach(ing => {
-                    const tr = document.createElement("tr");
-                    tr.innerHTML = `
-                        <td>${ing.name}</td>
-                        <td>${ing.current_stock}</td>
-                        <td>${ing.unit}</td>
-                        <td class="text-center">
-                            <button class="btn btn-sm btn-success me-1" onclick="openBeliModal(${ing.id})">Beli</button>
-                            <button class="btn btn-sm btn-warning me-1 edit-btn" data-id="${ing.id}">Edit</button>
-                            <button class="btn btn-sm btn-danger hapus-btn" data-id="${ing.id}">Hapus</button>
-                        </td>
-                    `;
-                    inventoryTableBody.appendChild(tr);
-                });
-                document.querySelectorAll(".hapus-btn").forEach(btn => {
-                    btn.addEventListener("click", async e => {
-                        const id = e.currentTarget.dataset.id;
-                        if (confirm("Yakin ingin menghapus bahan ini?")) {
-                            await deleteIngredient(id);
-                        }
-                    });
-                });
-                document.querySelectorAll(".edit-btn").forEach(btn => {
-                    btn.addEventListener("click", async e => {
-                        const id = e.currentTarget.dataset.id;
-                        const qtyStr = prompt("Masukkan jumlah yang ingin dikurangi (angka):");
-                        const qty = parseFloat(qtyStr);
-                        if (!isNaN(qty) && qty > 0) await editIngredient(id, qty);
-                        else alert("Jumlah tidak valid.");
-                    });
-                });
+
+                // Render halaman pertama dan setup paginasi
+                renderIngredientsTable(1);
+                setupBahanPagination();
+
             } catch (err) {
                 inventoryTableBody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">Error: ${err.message}</td></tr>`;
                 console.error(err);
             }
         }
+        // --- END MODIFIKASI ---
 
         async function addIngredient() {
             if (!saveBahanBtn) return;
@@ -1208,8 +1532,14 @@
                     return;
                 }
                 try {
+                    
+                    await fetch('/sanctum/csrf-cookie', {
+                        method: 'GET',
+                        credentials: 'include'
+                    });
                     const res = await fetch(PURCHASE_API, {
                         method: "POST",
+                        credentials: "include",
                         headers: buildHeaders(true),
                         body: JSON.stringify({
                             ingredient_id: id,
@@ -1235,6 +1565,8 @@
                     alert(result.message || "Pembelian berhasil");
                     loadIngredients();
                     loadPurchaseHistory();
+                    loadHistory(); // Refresh riwayat saldo
+                    loadSaldo(); // Refresh saldo
                 } catch (err) {
                     if (beliErrors) {
                         beliErrors.classList.remove("d-none");
@@ -1252,6 +1584,7 @@
             try {
                 const res = await fetch(PURCHASE_API, {
                     method: "GET",
+                    credentials: "include",
                     headers: {
                         "Accept": "application/json"
                     }
@@ -1283,5 +1616,482 @@
         if (saveBahanBtn) saveBahanBtn.addEventListener("click", addIngredient);
         window.openBeliModal = openBeliModal;
     </script>
+<script>
+    function getCsrfToken() {
+    const match = document.cookie.match(new RegExp('(^| )XSRF-TOKEN=([^;]+)'));
+    return match ? decodeURIComponent(match[2]) : null;
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+    const balanceEl = document.getElementById("current-balance");
+    const historyTableBody = document.getElementById("history-table-body");
+    const historyLoader = document.getElementById("history-loader");
+    const addBalanceForm = document.getElementById("addBalanceForm");
+
+    // ===== Format angka rupiah =====
+    function formatRupiah(angka) {
+        return new Intl.NumberFormat('id-ID', {
+            style: 'currency',
+            currency: 'IDR'
+        }).format(angka);
+    }
+
+    // ===== Load saldo saat ini =====
+    async function loadSaldo() {
+        try {
+            const res = await fetch("api/saldo");
+            const data = await res.json();
+
+            if (data.success) {
+                balanceEl.textContent = formatRupiah(data.data.total_revenue);
+            } else {
+                balanceEl.textContent = "Gagal memuat saldo";
+            }
+        } catch (err) {
+            balanceEl.textContent = "Error koneksi";
+        }
+    }
+
+    let currentPage = 1;
+
+    async function loadHistory(page = 1) {
+        try {
+            const response = await fetch(`/api/saldo/history?page=${page}`, {
+                method: 'GET',
+                headers: { 'Accept': 'application/json' }
+            });
+
+            if (!response.ok) throw new Error("Gagal fetch data");
+
+            const result = await response.json();
+            const tbody = document.getElementById('history-table-body');
+            tbody.innerHTML = '';
+
+            const records = result.data.data; // sesuai format Laravel paginate()
+
+            if (records.length > 0) {
+                records.forEach(item => {
+                    const row = document.createElement('tr');
+
+                    const jenis = item.type === "income" ? "Masuk" : "Keluar";
+                    const tanggal = new Date(item.created_at).toLocaleString('id-ID', {
+                        dateStyle: 'short',
+                        timeStyle: 'short'
+                    });
+
+                    row.innerHTML = `
+                        <td>${tanggal}</td>
+                        <td>${item.reason}</td>
+                        <td>${jenis}</td>
+                        <td class="text-end ${item.type === "income" ? "text-success" : "text-danger"}">
+                            Rp ${Number(item.amount).toLocaleString('id-ID')}
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            } else {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="text-center text-muted">Belum ada data riwayat.</td>
+                    </tr>
+                `;
+            }
+
+            renderPagination(result.data);
+
+        } catch (error) {
+            console.error("Error ❌:", error);
+            document.getElementById('history-table-body').innerHTML = `
+                <tr>
+                    <td colspan="4" class="text-center text-danger">Gagal memuat data.</td>
+                </tr>
+            `;
+        }
+    }
+    
+
+    function renderPagination(meta) {
+        const pagination = document.getElementById('history-pagination');
+        pagination.innerHTML = '';
+
+        if (meta.last_page <= 1) return;
+
+        for (let i = 1; i <= meta.last_page; i++) {
+            const btn = document.createElement('button');
+            btn.textContent = i;
+            btn.className = `btn btn-sm ${i === meta.current_page ? 'btn-brown text-white' : 'btn-outline-brown'} mx-1`;
+            btn.onclick = () => loadHistory(i);
+            pagination.appendChild(btn);
+        }
+    }
+
+
+    // ===== Simpan transaksi ke tabel sementara (dummy) =====
+    function addHistoryRow(tanggal, keterangan, jenis, jumlah) {
+        const row = `
+            <tr>
+                <td>${tanggal}</td>
+                <td>${keterangan}</td>
+                <td>${jenis}</td>
+                <td class="text-end">${formatRupiah(jumlah)}</td>
+            </tr>
+        `;
+        historyTableBody.insertAdjacentHTML("afterbegin", row);
+    }
+
+    // ===== Tambah saldo =====
+     addBalanceForm.addEventListener("submit", async function (e) {
+    e.preventDefault();
+
+    const amount = document.getElementById("amount").value;
+    const reason = document.getElementById("reason").value;
+
+    try {
+        // 1. Ambil CSRF cookie
+        await fetch('/sanctum/csrf-cookie', {
+            method: 'GET',
+            credentials: 'include'
+        });
+
+        // 2. Kirim POST tambah saldo
+        const res = await fetch("api/saldo/add", {
+            method: "POST",
+            credentials: "include",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "X-XSRF-TOKEN": getCsrfToken()
+            },
+            body: JSON.stringify({ amount, reason })
+        });
+
+        console.log("Fetch selesai ✅, status:", res.status);
+
+        const data = await res.json();
+
+        if (data.success) {
+            alert(data.message);
+            loadSaldo();
+            addHistoryRow(new Date().toLocaleString(), reason, "Pemasukan", amount);
+
+            // Tutup modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById("addBalanceModal"));
+            modal.hide();
+            addBalanceForm.reset();
+        } else {
+            alert("Gagal: " + JSON.stringify(data.errors || data.message));
+        }
+    } catch (err) {
+        console.error("Error fetch ❌:", err);
+    }
+});
+
+    // ===== Contoh mencatat pengeluaran =====
+    async function recordExpense() {
+        const jumlah = prompt("Masukkan jumlah pengeluaran:");
+        const alasan = prompt("Masukkan alasan pengeluaran:");
+
+        if (jumlah && alasan && !isNaN(jumlah)) {
+            try {
+                const res = await fetch("api/saldo/record", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify({
+                        amount: jumlah,
+                        reason: alasan
+                    })
+                });
+
+                const data = await res.json();
+                if (data.success) {
+                    alert(data.message);
+                    loadSaldo();
+                    addHistoryRow(new Date().toLocaleString(), alasan, "Pengeluaran", jumlah);
+                } else {
+                    alert("Gagal: " + JSON.stringify(data.errors));
+                }
+            } catch (err) {
+                alert("Error koneksi server");
+            }
+        }
+    }
+
+    loadSaldo();
+    loadHistory();
+    historyLoader.style.display = "none"; // Karena belum ada API riwayat asli
+});
+</script>
+
+<script>
+async function loadRoles() {
+    const select = document.getElementById("role_id");
+    select.innerHTML = `<option value="">Memuat...</option>`;
+
+    try {
+        const res = await fetch("/api/roles");
+        const roles = await res.json();
+
+        select.innerHTML = "";
+        roles.forEach(role => {
+            const opt = document.createElement("option");
+            opt.value = role.id_roles;
+            opt.textContent = role.name;
+            select.appendChild(opt);
+        });
+    } catch (err) {
+        console.error("❌ Gagal fetch roles:", err);
+        select.innerHTML = `<option value="">Gagal memuat role</option>`;
+    }
+}
+
+// submit tambah karyawan
+document.getElementById("addKaryawanForm").addEventListener("submit", async function(e) {
+    e.preventDefault();
+
+    const name     = document.getElementById("name").value;
+    const email    = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
+    const role_id  = document.getElementById("role_id").value;
+
+    try {
+        await fetch('/sanctum/csrf-cookie', {
+            method: 'GET',
+            credentials: 'include'
+        });
+        const res = await fetch("/api/register", {
+            method: "POST",
+            credentials: "include",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "X-XSRF-TOKEN": getCsrfToken()
+            },
+            body: JSON.stringify({ name, email, password, role_id })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+            alert(data.message);
+
+            // tutup modal
+            bootstrap.Modal.getInstance(document.getElementById("addKaryawanModal")).hide();
+            e.target.reset();
+
+            // reload data karyawan
+            loadKaryawan();
+        } else {
+            alert("Gagal: " + JSON.stringify(data.errors));
+        }
+    } catch (err) {
+        console.error("❌ Error register:", err);
+    }
+});
+
+// panggil saat halaman siap
+document.addEventListener("DOMContentLoaded", () => {
+    loadRoles();
+// asumsinya kamu udah punya function ini buat isi tabel
+});
+</script>
+<script>
+async function loadKaryawan(page = 1) {
+  const tbody = document.getElementById('karyawan-table-body');
+  const paginationEl = document.getElementById('karyawanPagination');
+
+  try {
+    tbody.innerHTML = `<tr><td colspan="4" class="text-center">Loading...</td></tr>`;
+    const res = await fetch(`/api/users?page=${page}`, { headers: { 'Accept': 'application/json' }});
+    const data = await res.json();
+    const users = data.data ?? [];
+
+    if (users.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="4" class="text-center">Tidak ada data</td></tr>`;
+    } else {
+      tbody.innerHTML = '';
+      users.forEach(u => {
+        tbody.innerHTML += `
+          <tr>
+            <td>${u.name}</td>
+            <td>${u.email}</td>
+            <td>${u.role?.name ?? '-'}</td>
+            <td>
+              <button class="btn btn-sm btn-warning" onclick="openEditModal(${u.id_user}, '${u.name}', '${u.email}', ${u.role_id})">Edit</button>
+              <button class="btn btn-sm btn-danger" onclick="deleteKaryawan(${u.id_user})">Hapus</button>
+            </td>
+          </tr>`;
+      });
+    }
+
+    // pagination
+    let html = `<ul class="pagination justify-content-center">`;
+    if (data.current_page > 1) {
+      html += `<li class="page-item"><a href="#" class="page-link" onclick="loadKaryawan(${data.current_page - 1})">Prev</a></li>`;
+    }
+    for (let i = 1; i <= data.last_page; i++) {
+      html += `<li class="page-item ${i === data.current_page ? 'active' : ''}">
+                 <a href="#" class="page-link" onclick="loadKaryawan(${i})">${i}</a>
+               </li>`;
+    }
+    if (data.current_page < data.last_page) {
+      html += `<li class="page-item"><a href="#" class="page-link" onclick="loadKaryawan(${data.current_page + 1})">Next</a></li>`;
+    }
+    html += `</ul>`;
+    paginationEl.innerHTML = html;
+
+  } catch (err) {
+    console.error(err);
+    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">Gagal load data</td></tr>`;
+  }
+}
+
+// buka modal edit
+function openEditModal(id, name, email, role_id) {
+  document.getElementById('editId').value = id;
+  document.getElementById('editName').value = name;
+  document.getElementById('editEmail').value = email;
+  document.getElementById('editRole').value = role_id;
+  document.getElementById('editPassword').value = '';
+
+  const modal = new bootstrap.Modal(document.getElementById('editKaryawanModal'));
+  modal.show();
+}
+
+// submit form edit
+document.getElementById('editKaryawanForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const id = document.getElementById('editId').value;
+
+  const payload = {
+    name: document.getElementById('editName').value,
+    email: document.getElementById('editEmail').value,
+    role_id: document.getElementById('editRole').value,
+    password: document.getElementById('editPassword').value || null
+  };
+
+  try {
+    const res = await fetch(`/api/karyawan/${id}`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        "X-XSRF-TOKEN": getCsrfToken()
+      },
+      body: JSON.stringify(payload)
+    });
+    const result = await res.json();
+    if (result.success) {
+      alert('Karyawan berhasil diupdate');
+      bootstrap.Modal.getInstance(document.getElementById('editKaryawanModal')).hide();
+      loadKaryawan();
+    } else {
+      alert('Gagal update: ' + (result.message || 'Unknown error'));
+    }
+  } catch (err) {
+    console.error(err);
+    alert('Terjadi kesalahan saat update');
+  }
+});
+
+// hapus karyawan
+async function deleteKaryawan(id) {
+  if (!confirm('Yakin ingin menghapus karyawan ini?')) return;
+
+  try {
+    const res = await fetch(`/api/karyawan/${id}`, {
+      method: 'DELETE',
+      headers: { 
+        'Accept': 'application/json',
+        "X-XSRF-TOKEN": getCsrfToken() 
+    }
+    });
+    const result = await res.json();
+    if (result.success) {
+      alert('Karyawan berhasil dihapus');
+      loadKaryawan();
+    } else {
+      alert('Gagal hapus: ' + (result.message || 'Unknown error'));
+    }
+  } catch (err) {
+    console.error(err);
+    alert('Terjadi kesalahan saat hapus');
+  }
+}
+
+// panggil pertama kali
+loadKaryawan();
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
+<script>
+function exportPDF() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    // Judul
+    const reportTitle = document.getElementById("report-period-title").innerText || "Laporan Penjualan";
+    doc.setFontSize(14);
+    doc.text(reportTitle, 14, 15);
+
+    // Ambil header tabel
+    const tableHeader = [];
+    document.querySelectorAll("#table-header-row th").forEach(th => {
+        tableHeader.push(th.innerText);
+    });
+
+    // Ambil body tabel
+    const tableBody = [];
+    document.querySelectorAll("#salesTableBody tr").forEach(tr => {
+        const row = [];
+        tr.querySelectorAll("td").forEach(td => {
+            row.push(td.innerText);
+        });
+        tableBody.push(row);
+    });
+
+    if (tableBody.length === 0) {
+        alert("Tidak ada data untuk diexport.");
+        return;
+    }
+
+    // Generate tabel ke PDF
+    doc.autoTable({
+        head: [tableHeader],
+        body: tableBody,
+        startY: 25,
+        styles: { fontSize: 10 }
+    });
+
+    // Tentukan nama file berdasarkan tipe laporan
+    const reportType = document.getElementById("reportType").value;
+    let filename = "laporan_penjualan";
+
+    switch (reportType) {
+        case "daily":
+            filename += "_harian";
+            break;
+        case "weekly":
+            filename += "_mingguan";
+            break;
+        case "monthly":
+            filename += "_bulanan";
+            break;
+        case "yearly":
+            filename += "_tahunan";
+            break;
+    }
+
+    doc.save(`${filename}.pdf`);
+}
+</script>
+
+
+
+
 </body>
 </html>

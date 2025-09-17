@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login Modern</title>
+    <title>Hippo Coffee - Login</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -216,57 +216,68 @@
     </div>
 
     <script>
-document.getElementById('loginForm').addEventListener('submit', async function(event) {
+        function getCsrfToken() {
+            const name = 'XSRF-TOKEN';
+            const cookieString = document.cookie;
+            const cookies = cookieString.split(';').map(c => c.trim());
+            const cookie = cookies.find(c => c.startsWith(name + '='));
+            if (cookie) {
+                // Decode URI component untuk handle karakter khusus
+                return decodeURIComponent(cookie.substring(name.length + 1));
+            }
+        return null;
+}
+    </script>
+    <script>
+    document.getElementById('loginForm').addEventListener('submit', async function(event) {
     event.preventDefault();
+
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
 
     if (!email || !password) {
-        console.log("Email/password kosong ❌");
         alert('Silakan isi semua bidang.');
         return;
     }
 
     try {
-        const response = await fetch('/api/login', {
+        
+        await fetch('/sanctum/csrf-cookie', {
+            method: 'GET',
+            credentials: 'include'
+        });
+
+        
+        const response = await fetch('/login', {  
             method: 'POST',
+            credentials: 'include', 
             headers: {
                 'Content-Type': 'application/json',
+                'Accept': 'application/json', 
+                'X-XSRF-TOKEN': getCsrfToken() 
             },
             body: JSON.stringify({ email, password }),
         });
 
         console.log("Fetch selesai ✅, status:", response.status);
 
-        let data;
-        try {
-            data = await response.json();
-        } catch (jsonError) {
-            console.error("Gagal parse JSON ❌", jsonError);
-            return;
-        }
+        const data = await response.json();
 
         if (data.message === "Login berhasil") {
-            // simpan token setelah JSON berhasil di-parse
-            localStorage.setItem('token', data.token);
-
-            if (data.role_id == 1) {
-                window.location.href = '/dashboardOwner';
-            } else if (data.role_id == 2) {
-                window.location.href = '/dashboardKasir';
-            } else if (data.role_id == 3) {
-                window.location.href = '/dashboardAdmin';
-            } else {
-                window.location.href = '/';
-            }
+            
+            if (data.role_id == 1) window.location.href = '/dashboardOwner';
+            else if (data.role_id == 2) window.location.href = '/dashboardKasir';
+            else if (data.role_id == 3) window.location.href = '/dashboardAdmin';
+            else window.location.href = '/';
         } else {
-            console.warn("Login gagal ❌:", data.message);
             alert('Login gagal: ' + (data.message || 'Cek email/password'));
         }
+
     } catch (error) {
         console.error("Error fetch ❌:", error);
     }
 });
+
 </script>
 
 

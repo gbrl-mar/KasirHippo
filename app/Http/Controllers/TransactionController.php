@@ -5,12 +5,14 @@ namespace App\Http\Controllers;
 use App\Models\Product;
 use App\Models\Transaction;
 use App\Models\SiteSetting;
+use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
 use App\Http\Resources\TransactionResource;
+use App\Models\BalanceHistory;
 use Exception;
 
 class TransactionController extends Controller
@@ -32,12 +34,12 @@ class TransactionController extends Controller
     }
 
 
-    public function store(Request $request)
+     public function store(Request $request)
     {
         // Validasi input dari request
         $validator = Validator::make($request->all(), [
             'customer_name' => 'nullable|string|max:255',
-            'payment_method' => 'required|string|in:cash,credit_card,qris',
+            'payment_method' => 'required|string|in:cash,credit_card,bank_transfer,qris',
             'amount_paid' => 'required|numeric|min:0',
             'products' => 'required|array|min:1',
             'products.*.product_id' => 'required|integer|exists:products,id',
@@ -66,28 +68,23 @@ class TransactionController extends Controller
             foreach ($request->products as $item) {
                 $product = $products->get($item['product_id']);
 
-                // Penanganan jika produk (karena suatu hal) tidak ditemukan setelah query
                 if (!$product) {
-                    DB::rollBack();
-                    return response()->json(['success' => false, 'message' => "Produk dengan ID {$item['product_id']} tidak ditemukan."], 404);
+                    // Jika produk tidak ditemukan, batalkan transaksi
+                    throw new Exception("Produk dengan ID {$item['product_id']} tidak ditemukan.");
                 }
                 
-                // Cek ketersediaan produk
                 if (!$product->is_available) {
-                    DB::rollBack();
-                    return response()->json([
-                        'success' => false,
-                        'message' => "Produk '{$product->name}' saat ini tidak tersedia."
-                    ], 400);
+                    // Jika produk tidak tersedia, batalkan transaksi
+                    throw new Exception("Produk '{$product->name}' saat ini tidak tersedia.");
                 }
                 
                 // === LOGIKA HARGA DINAMIS ===
                 $priceAtTransaction = $product->price; // Harga default dari database
                 
-                // Asumsi ID kategori Manual Brew adalah 7
+                // Asumsi ID kategori Manual Brew adalah 7 (bisa diubah atau diambil dari config)
                 $manualBrewCategoryId = 7; 
 
-                // Jika produk adalah Manual Brew DAN ada harga manual yang dikirim dari client
+                // Jika produk adalah Manual Brew DAN ada harga manual yang dikirim
                 if ($product->category_id == $manualBrewCategoryId && isset($item['price'])) {
                     // Gunakan harga yang diinput manual
                     $priceAtTransaction = $item['price'];
@@ -101,7 +98,7 @@ class TransactionController extends Controller
                 $transactionDetailsData[] = [
                     'product_id' => $product->id,
                     'quantity' => $item['quantity'],
-                    'price_at_transaction' => $priceAtTransaction, // Simpan harga yang digunakan saat transaksi
+                    'price_at_transaction' => $priceAtTransaction,
                     'subtotal' => $subtotal,
                 ];
             }
@@ -109,30 +106,35 @@ class TransactionController extends Controller
             // Hitung kembalian
             $changeDue = $request->amount_paid - $totalPrice;
             if ($changeDue < 0) {
-                 DB::rollBack();
-                 return response()->json([
-                     'success' => false,
-                     'message' => 'Jumlah yang dibayarkan kurang dari total harga.'
-                 ], 400);
+                 throw new Exception("Jumlah bayar tidak mencukupi. Kurang " . abs($changeDue));
             }
 
             // Buat record transaksi utama
             $transaction = Transaction::create([
-                'user_id' => Auth::id(), // Mengambil ID user yang sedang login
-                'transaction_code' => 'INV-' . time() . Auth::id(), // Contoh kode transaksi unik
+                'user_id' => Auth::id(),
+                'transaction_code' => 'INV-' . time(),
                 'customer_name' => $request->customer_name,
                 'total_price' => $totalPrice,
                 'payment_method' => $request->payment_method,
                 'amount_paid' => $request->amount_paid,
                 'change_due' => $changeDue,
-                'payment_status' => 'paid', // Asumsi langsung lunas
+                'payment_status' => 'paid',
                 'transaction_date' => now(),
             ]);
 
-            // Buat record detail transaksi menggunakan relasi
             $transaction->transaction_details()->createMany($transactionDetailsData);
 
-            // Jika semua berhasil, commit transaksi ke database
+         
+            $totalRevenueSetting = Setting::where('key', 'total_revenue')->lockForUpdate()->first();
+            BalanceHistory::create([
+                'amount' => $totalPrice,
+                'type' => 'income',
+                'reason' => 'Pendapatan dari transaksi ' . $transaction->transaction_code,
+                'recorded_at' => now(),
+            ]);
+            $totalRevenueSetting->value += $totalPrice;
+            $totalRevenueSetting->save();
+         
             DB::commit();
 
             // Load relasi untuk data response JSON
@@ -211,29 +213,27 @@ class TransactionController extends Controller
    public function history(Request $request)
 {
     $query = Transaction::query()
-        // Eager load relasi untuk menghindari N+1 Query Problem
-        // Kita butuh 'user' dan 'transaction_details' beserta 'product' di dalamnya
+        
         ->with(['user', 'transaction_details.product'])
         
-        // ✅ Logika penting: History hanya untuk transaksi yang sudah selesai (final)
+    
         ->whereIn('payment_status', ['paid', 'cancelled']);
 
-    // Filter berdasarkan tanggal jika diberikan
+  
     if ($request->has('date')) {
-        // Sebaiknya divalidasi, tapi untuk sekarang kita sederhanakan
+      
         $query->whereDate('transaction_date', $request->input('date'));
     }
 
-    // Filter berdasarkan metode pembayaran jika diberikan
+  
     if ($request->has('payment_method')) {
         $query->where('payment_method', $request->input('payment_method'));
     }
 
-    // Mengurutkan dari yang terbaru dan melakukan paginasi
+   
     $transactions = $query->latest('transaction_date')->paginate(15);
 
-    // 🚀 Menggunakan Resource untuk mengubah koleksi data menjadi JSON yang rapi
-    // Struktur paginasi (meta, links) akan otomatis ditambahkan oleh Laravel
+  
     return TransactionResource::collection($transactions)->additional([
         'success' => true,
         'message' => 'Riwayat transaksi berhasil diambil.',

@@ -8,25 +8,31 @@ use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\LaporanController;
 use App\Http\Controllers\IngredientPurchaseController;
 use App\Http\Controllers\IngredientController;
+use App\Http\Controllers\RevenueController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
 
 Route::post('/register', [AuthUserController::class, 'register']);
+Route::post('/karyawan/{id}', [AuthUserController::class, 'update']);
+Route::delete('/karyawan/{id}', [AuthUserController::class, 'destroy']);
+Route::post('/user', [AuthUserController::class, 'userList']);
+Route::get('/roles', [AuthUserController::class, 'roles']);
+
 Route::post('/login', [AuthUserController::class, 'login']);
 Route::post('/loginMobile', [AuthUserController::class, 'loginMobile']);
 Route::post('/logout', [AuthUserController::class, 'logout'])->middleware('auth:sanctum');
 Route::get('/users', [AuthUserController::class, 'userList'])->middleware('auth:sanctum');
 Route::post('/products/{id}/disable', [ProductController::class, 'disableProduct'])->middleware('auth:sanctum');
 Route::post('/products/{id}/enable', [ProductController::class, 'enableProduct'])->middleware('auth:sanctum');
-Route::put('/products/{product}', [ProductController::class, 'updateProduct']);
+Route::put('/products/{product}', [ProductController::class, 'updateProduct'])->middleware('auth:sanctum');
 Route::get('/categories', [ProductController::class, 'viewCategories']);
 Route::get('/products/{id}', [ProductController::class, 'viewById']);
 Route::controller(ProductController::class)->group(function () {
-    Route::get('/products', 'viewProducts');
+    Route::get('/products', 'viewProducts')->middleware('auth:sanctum');
     Route::get('/productsMobile', 'viewProductsMobile');
-    Route::post('/products', 'addProduct');
+    Route::post('/products', 'addProduct')->middleware('auth:sanctum');
 });
 Route::post('/transactions', [TransactionController::class, 'store'])->middleware('auth:sanctum');
 Route::get('/getPaymentInfo', [TransactionController::class, 'getPaymentInfo']);
@@ -40,5 +46,14 @@ Route::post('/reports/yearly', [LaporanController::class, 'yearlyReport']);
 Route::get('/history', [TransactionController::class, 'history']);
 Route::post('/transactions/{transaction}/adjust', [TransactionController::class, 'adjustTransaction']);
 
-Route::apiResource('ingredients', IngredientController::class);
-Route::apiResource('/purchases', IngredientPurchaseController::class);
+Route::apiResource('/ingredients', IngredientController::class);
+Route::apiResource('/purchases', IngredientPurchaseController::class)->middleware('auth:sanctum');
+
+
+
+Route::controller( RevenueController::class)->group(function() {
+    Route::get('/saldo', 'show');
+    Route::post('/saldo/add', 'add');
+    Route::post('/saldo/record', 'recordExpense');
+    Route::get('/saldo/history', 'history');
+});

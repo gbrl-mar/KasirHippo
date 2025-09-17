@@ -9,6 +9,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
+use App\Models\Setting;
+use App\Models\BalanceHistory;
+use Exception;
+
 
 class IngredientPurchaseController extends Controller
 {
@@ -40,58 +44,73 @@ class IngredientPurchaseController extends Controller
      */
     public function store(Request $request)
     {
-        // Validasi manual untuk kontrol response JSON yang lebih baik
         $validator = Validator::make($request->all(), [
-            'ingredient_id'      => 'required|exists:ingredients,id',
+            'ingredient_id' => 'required|integer|exists:ingredients,id',
             'quantity_purchased' => 'required|numeric|min:0.01',
-            'cost'               => 'required|numeric|min:0',
-            'purchase_date'      => 'required|date',
+            'cost' => 'required|numeric|min:0',
+            'purchase_date' => 'required|date',
         ]);
 
-        // Jika validasi gagal, kembalikan error dalam format JSON
         if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validasi gagal.',
-                'errors'  => $validator->errors()
-            ], 422); // HTTP 422 Unprocessable Entity
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
         }
 
-        try {
-            $newPurchase = null; // Variabel untuk menampung data baru
-
-            // Transaksi database tetap digunakan untuk keamanan data
-            DB::transaction(function () use ($request, &$newPurchase) {
-                $validatedData = $request->all();
-
-                // 1. Update stok
-                $ingredient = Ingredient::findOrFail($validatedData['ingredient_id']);
-                $ingredient->increment('current_stock', $validatedData['quantity_purchased']);
-
-                // 2. Buat record pembelian baru
-                $newPurchase = IngredientPurchase::create([
-                    'ingredient_id'      => $validatedData['ingredient_id'],
-                    'quantity_purchased' => $validatedData['quantity_purchased'],
-                    'cost'               => $validatedData['cost'],
-                    'purchase_date'      => $validatedData['purchase_date'],
-                    'user_id'            => Auth::id() ?? 1, // Ganti '1' dengan fallback user jika API tidak terautentikasi
-                ]);
-            });
-
-            // Jika transaksi berhasil, kembalikan data baru
-            return response()->json([
-                'success' => true,
-                'message' => 'Pembelian berhasil dicatat dan stok telah diperbarui!',
-                'data'    => $newPurchase->load(['ingredient:id,name', 'user:id,name']) // Muat relasi untuk response
-            ], 201); // HTTP 201 Created
-
-        } catch (\Exception $e) {
-            // Jika ada error server, kembalikan response error
+        // --- TAMBAHAN: Pengecekan otentikasi pengguna ---
+        if (!Auth::check()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Terjadi kesalahan pada server.',
-                'error'   => $e->getMessage()
-            ], 500); // HTTP 500 Internal Server Error
+                'message' => 'Tidak terautentikasi. Silakan login terlebih dahulu.',
+            ], 401);
+        }
+        // --- AKHIR TAMBAHAN ---
+
+        // Mulai transaksi database untuk memastikan semua operasi berhasil atau gagal bersamaan
+        DB::beginTransaction();
+        try {
+            $ingredient = Ingredient::lockForUpdate()->findOrFail($request->ingredient_id);
+
+            // 1. Simpan data pembelian
+            IngredientPurchase::create([
+                'ingredient_id' => $ingredient->id,
+                'user_id' => Auth::id(), // Menggunakan Auth::id() yang sudah dicek
+                'quantity_purchased' => $request->quantity_purchased,
+                'cost' => $request->cost,
+                'purchase_date' => $request->purchase_date,
+            ]);
+
+            // 2. Tambah stok bahan baku
+            $ingredient->current_stock += $request->quantity_purchased;
+            $ingredient->save();
+
+            // 3. Kurangi saldo (total_revenue)
+            $totalRevenueSetting = Setting::where('key', 'total_revenue')->lockForUpdate()->firstOrFail();
+            $totalRevenueSetting->value -= $request->cost;
+            $totalRevenueSetting->save();
+            
+            // 4. Catat di riwayat saldo
+            BalanceHistory::create([
+                'type' => 'expense',
+                'amount' => $request->cost,
+                'reason' => "Pembelian bahan baku: {$ingredient->name}",
+            ]);
+
+            // Jika semua berhasil, commit transaksi
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Pembelian berhasil dicatat dan saldo telah diperbarui.'
+            ], 201);
+
+        } catch (Exception $e) {
+            // Jika ada error, batalkan semua perubahan
+            DB::rollBack();
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan saat memproses pembelian.',
+                'error' => $e->getMessage()
+            ], 500);
         }
     }
 }
