@@ -462,10 +462,7 @@
                             </tbody>
                         </table>
                         <div class="mt-3 text-center" id="history-pagination"></div>
-                        <div id="history-loader" class="text-center p-4">
-                            <div class="spinner-border text-brown" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
+                        
                         </div>
                     </div>
 
