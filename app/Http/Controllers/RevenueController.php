@@ -82,12 +82,62 @@ class RevenueController extends Controller
         }
     }
 
-    /**
-     * Mencatat pengeluaran dan mengurangi total pendapatan.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\JsonResponse
-     */
+    public function tarikSaldo(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'amount' => 'required|numeric|min:1',
+            'reason' => 'required|string|max:255',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+        }
+
+        DB::beginTransaction();
+        try {
+            $totalRevenueSetting = Setting::where('key', 'total_revenue')->lockForUpdate()->firstOrFail();
+            
+            
+            if ($totalRevenueSetting->value < $request->amount) {
+                
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Gagal menarik saldo. Saldo tidak mencukupi.'
+                ], 400);
+            }
+
+        
+            $totalRevenueSetting->value -= $request->amount;
+            $totalRevenueSetting->save();
+            
+         
+            BalanceHistory::create([
+                'amount' => $request->amount,
+                'type'   => 'expense', 
+                'reason' => $request->reason,
+                
+            ]);
+            
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Saldo berhasil ditarik.',
+                'data' => [
+                    'new_total_revenue' => (float) $totalRevenueSetting->value,
+                ]
+            ]);
+
+        } catch (Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false, 
+                'message' => 'Gagal menarik saldo.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
     public function recordExpense(Request $request)
     {
         $validator = Validator::make($request->all(), [

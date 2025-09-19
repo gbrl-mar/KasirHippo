@@ -427,15 +427,22 @@
                         <button class="btn btn-brown" id="add-balance-btn" data-bs-toggle="modal" data-bs-target="#addBalanceModal">
                             <i class="fas fa-plus me-1"></i> Tambah Saldo
                         </button>
+                        
                     </div>
-
+                    
                     <!-- Kartu untuk menampilkan saldo -->
                     <div class="card balance-card border-0 shadow-sm mb-4">
                         <div class="card-body text-center p-4">
                             <h6 class="card-subtitle mb-2 text-black-50">SALDO SAAT INI</h6>
                             <p class="card-title balance-value" id="current-balance">Memuat...</p>
                             <small class="text-black-50">Diperbarui dari server</small>
+                            
                         </div>
+                    </div>
+                    <div style="justify-content: center; display: flex; margin-bottom: 20px;">
+                    <button class="btn btn-success" id="tarik-balance-btn" data-bs-toggle="modal" data-bs-target="#tarikBalanceModal">
+                            <i class="fas fa-money-bills me-1"></i> Tarik Saldo
+                        </button>
                     </div>
                     
                     <!-- Tabel Riwayat Saldo -->
@@ -578,6 +585,36 @@
         </div>
     </div>
     </div>
+
+    <!-- Modal Tarik Saldo -->
+<div class="modal fade" id="tarikBalanceModal" tabindex="-1" aria-labelledby="tarikBalanceLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="tarikBalanceLabel">Tarik Saldo</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+      </div>
+      <div class="modal-body">
+        <form id="tarikBalanceForm">
+          <div class="mb-3">
+            <label for="withdrawAmount" class="form-label">Jumlah</label>
+            <input type="number" class="form-control" id="withdrawAmount" name="amount" placeholder="Masukkan jumlah saldo" required>
+          </div>
+          <div class="mb-3">
+            <label for="withdrawReason" class="form-label">Keterangan</label>
+            <textarea class="form-control" id="withdrawReason" name="reason" rows="2" placeholder="Masukkan alasan penarikan" required>Tarik Saldo</textarea>
+          </div>
+          <div id="tarikBalanceAlert" class="alert d-none"></div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+        <button type="button" class="btn btn-success" id="tarikButton">Tarik</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 
     <div class="modal fade" id="addBahanModal" tabindex="-1" aria-labelledby="addBahanModalLabel" aria-hidden="true">
         <div class="modal-dialog">
@@ -752,11 +789,31 @@
             populateCategoryDropdown('addProductCategory');
             populateCategoryDropdown('editProductCategory');
 
-            document.getElementById('logout-btn').addEventListener('click', () => {
-                // Remove the token from local storage
-                localStorage.removeItem('token');
-                // Redirect to the login page
-                window.location.href = '/'; 
+            document.getElementById('logout-btn').addEventListener('click', async() => {
+                const ok = confirm("Apakah Anda yakin ingin logout?");
+                if (!ok) return;
+                 try {
+                    const response = await fetch("/api/logout", {
+                        method: "POST", // SPA pakai POST
+                        headers: {
+                            "Accept": "application/json",
+                            "Content-Type": "application/json",
+                            "X-XSRF-TOKEN": getCsrfToken()
+                        },
+                        credentials: "include"
+                    });
+
+                    if (response.ok) {
+                        alert("✅ Logout berhasil, sampai jumpa lagi!");
+                        window.location.href = "/";
+                    } else {
+                        const data = await response.json();
+                        alert("⚠️ Logout gagal: " + (data.message || "Terjadi kesalahan"));
+                    }
+                } catch (err) {
+                    console.error("Logout gagal:", err);
+                    alert("❌ Logout gagal karena error jaringan.");
+                }
             });
         });
 
@@ -1652,6 +1709,10 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
+    function refreshSaldoDanHistory() {
+            loadSaldo();
+            loadHistory(1); // paksa reload history halaman 1
+        }
     let currentPage = 1;
 
     async function loadHistory(page = 1) {
@@ -1679,12 +1740,14 @@ document.addEventListener("DOMContentLoaded", function () {
                         timeStyle: 'short'
                     });
 
+                    const amountClass = item.type === "income" ? "text-success" : "text-danger";
+
                     row.innerHTML = `
                         <td>${tanggal}</td>
                         <td>${item.reason}</td>
-                        <td>${jenis}</td>
-                        <td class="text-end ${item.type === "income" ? "text-success" : "text-danger"}">
-                            Rp ${Number(item.amount).toLocaleString('id-ID')}
+                        <td><span class="badge ${amountClass.replace('text', 'bg')}">${jenis}</span></td>
+                        <td class="text-end fw-bold ${amountClass}">
+                            ${item.type === "income" ? '+' : '-'} ${formatRupiah(item.amount)}
                         </td>
                     `;
                     tbody.appendChild(row);
@@ -1726,21 +1789,8 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
 
-    // ===== Simpan transaksi ke tabel sementara (dummy) =====
-    function addHistoryRow(tanggal, keterangan, jenis, jumlah) {
-        const row = `
-            <tr>
-                <td>${tanggal}</td>
-                <td>${keterangan}</td>
-                <td>${jenis}</td>
-                <td class="text-end">${formatRupiah(jumlah)}</td>
-            </tr>
-        `;
-        historyTableBody.insertAdjacentHTML("afterbegin", row);
-    }
-
     // ===== Tambah saldo =====
-     addBalanceForm.addEventListener("submit", async function (e) {
+    addBalanceForm.addEventListener("submit", async function (e) {
     e.preventDefault();
 
     const amount = document.getElementById("amount").value;
@@ -1771,8 +1821,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         if (data.success) {
             alert(data.message);
-            loadSaldo();
-            addHistoryRow(new Date().toLocaleString(), reason, "Pemasukan", amount);
+            refreshSaldoDanHistory();
 
             // Tutup modal
             const modal = bootstrap.Modal.getInstance(document.getElementById("addBalanceModal"));
@@ -1784,6 +1833,7 @@ document.addEventListener("DOMContentLoaded", function () {
     } catch (err) {
         console.error("Error fetch ❌:", err);
     }
+
 });
 
     // ===== Contoh mencatat pengeluaran =====
@@ -1808,8 +1858,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 const data = await res.json();
                 if (data.success) {
                     alert(data.message);
-                    loadSaldo();
-                    addHistoryRow(new Date().toLocaleString(), alasan, "Pengeluaran", jumlah);
+                    refreshSaldoDanHistory();
                 } else {
                     alert("Gagal: " + JSON.stringify(data.errors));
                 }
@@ -1820,9 +1869,57 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     loadSaldo();
-    loadHistory();
-    historyLoader.style.display = "none"; // Karena belum ada API riwayat asli
-});
+    loadHistory(); // Karena belum ada API riwayat asli
+    async function submitWithdraw() {
+        const amount = document.getElementById("withdrawAmount").value;
+        const reason = document.getElementById("withdrawReason").value;
+        const alertBox = document.getElementById("tarikBalanceAlert");
+            function refreshSaldoDanHistory() {
+                    loadSaldo();
+                    loadHistory(1); // paksa reload history halaman 1
+                }
+        try {
+            const res = await fetch("/api/saldo/withdraw", {
+            method: "POST",
+            credentials: "include",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "X-XSRF-TOKEN": getCsrfToken()
+            },
+            body: JSON.stringify({
+                amount: amount,
+                reason: reason
+            })
+            });
+
+            const data = await res.json();
+            console.log("Withdraw response:", data);
+
+            if (data.success) {
+            alertBox.className = "alert alert-success";
+            alertBox.innerText = data.message;
+            alertBox.classList.remove("d-none");
+
+            refreshSaldoDanHistory();
+            // tutup modal setelah delay
+            setTimeout(() => {
+                const modalEl = document.getElementById("tarikBalanceModal");
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                modal.hide();
+                alertBox.classList.add("d-none");
+            }, 1500);
+            } else {
+            throw new Error(data.message || "Gagal tarik saldo");
+            }
+        } catch (err) {
+            alertBox.className = "alert alert-danger";
+            alertBox.innerText = err.message;
+            alertBox.classList.remove("d-none");
+        }
+    }
+            document.getElementById("tarikButton").addEventListener("click", submitWithdraw);
+    });
 </script>
 
 <script>
@@ -2089,9 +2186,6 @@ function exportPDF() {
     doc.save(`${filename}.pdf`);
 }
 </script>
-
-
-
 
 </body>
 </html>

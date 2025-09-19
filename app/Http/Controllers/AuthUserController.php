@@ -63,7 +63,7 @@ class AuthUserController extends Controller
         ], 401);
     }
 
-    $request->session()->regenerate(); // penting untuk keamanan session
+    $request->session()->regenerate();
 
     return response()->json([
         'message' => 'Login berhasil',
@@ -98,12 +98,17 @@ class AuthUserController extends Controller
     ], 200);
 }
 
+
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete();
+        Auth::guard('web')->logout();
+
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
 
         return response()->json(['message' => 'Logged out successfully']);
     }
+
 
     public function userList(Request $request)
     {

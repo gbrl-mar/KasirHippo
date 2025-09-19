@@ -56,4 +56,5 @@ Route::controller( RevenueController::class)->group(function() {
     Route::post('/saldo/add', 'add');
     Route::post('/saldo/record', 'recordExpense');
     Route::get('/saldo/history', 'history');
+    Route::post('/saldo/withdraw', 'tarikSaldo');
 });
