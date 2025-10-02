@@ -1062,7 +1062,14 @@
         async function deleteProduct(id) {
             if (!confirm('Apakah Anda yakin ingin menghapus produk ini?')) return;
             try {
-                const response = await apiFetch(`/api/products/${id}`, { method: "DELETE" });
+                const response = await apiFetch(`/api/products/${id}`, { 
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Accept": "application/json",
+                        "X-XSRF-TOKEN": getCsrfToken()
+                    }
+                });
                 alert(response.message || 'Produk berhasil dihapus!');
                 fetchProducts();
             } catch (error) {
@@ -1085,6 +1092,11 @@
             try {
                 const response = await apiFetch(`/api/products/${productId}`, {
                     method: "PUT",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Accept": "application/json",
+                        "X-XSRF-TOKEN": getCsrfToken()
+                    },
                     body: JSON.stringify(payload),
                     credentials: "include"
                 });
@@ -1110,8 +1122,13 @@
                 is_available: document.getElementById('addProductStatus').value === '1'
             };
             try {
-                const response = await apiFetch('/api/products', {
+                const response = await apiFetch('/api/addProducts', {
                     method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Accept": "application/json",
+                        "X-XSRF-TOKEN": getCsrfToken()
+                    },
                     body: JSON.stringify(payload),
                     credentials: "include"
                 });

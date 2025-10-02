@@ -29,11 +29,11 @@ Route::post('/products/{id}/enable', [ProductController::class, 'enableProduct']
 Route::put('/products/{product}', [ProductController::class, 'updateProduct'])->middleware('auth:sanctum');
 Route::get('/categories', [ProductController::class, 'viewCategories']);
 Route::get('/products/{id}', [ProductController::class, 'viewById']);
-Route::controller(ProductController::class)->group(function () {
-    Route::get('/products', 'viewProducts')->middleware('auth:sanctum');
-    Route::get('/productsMobile', 'viewProductsMobile');
-    Route::post('/products', 'addProduct')->middleware('auth:sanctum');
-});
+Route::post('/products/{id}', [ProductController::class, 'deleteProduct'])->middleware('auth:sanctum');
+Route::get('/products', [ProductController::class,'viewProducts'])->middleware('auth:sanctum');
+Route::get('/productsMobile', [ProductController::class,'viewProductsMobile']);
+Route::post('/addProducts', [ProductController::class,'addProduct'])->middleware('auth:sanctum');
+
 Route::post('/transactions', [TransactionController::class, 'store'])->middleware('auth:sanctum');
 Route::get('/getPaymentInfo', [TransactionController::class, 'getPaymentInfo']);
 Route::get('/transactions/{transaction}/nota', [TransactionController::class, 'nota'])->middleware('auth:sanctum');

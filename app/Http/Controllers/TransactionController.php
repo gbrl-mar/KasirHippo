@@ -40,6 +40,7 @@ class TransactionController extends Controller
         $validator = Validator::make($request->all(), [
             'customer_name' => 'nullable|string|max:255',
             'payment_method' => 'required|string|in:cash,credit_card,bank_transfer,qris',
+            'products.*.notes' => 'nullable|string',
             'amount_paid' => 'required|numeric|min:0',
             'products' => 'required|array|min:1',
             'products.*.product_id' => 'required|integer|exists:products,id',
@@ -100,6 +101,7 @@ class TransactionController extends Controller
                     'quantity' => $item['quantity'],
                     'price_at_transaction' => $priceAtTransaction,
                     'subtotal' => $subtotal,
+                    'notes' => $item['notes'] ?? null,
                 ];
             }
             

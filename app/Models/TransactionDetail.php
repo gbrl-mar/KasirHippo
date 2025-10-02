@@ -35,7 +35,8 @@ class TransactionDetail extends Model
 		'product_id' => 'int',
 		'quantity' => 'int',
 		'price_at_transaction' => 'float',
-		'subtotal' => 'float'
+		'subtotal' => 'float',
+		'notes' => 'string'
 	];
 
 	protected $fillable = [
@@ -43,7 +44,8 @@ class TransactionDetail extends Model
 		'product_id',
 		'quantity',
 		'price_at_transaction',
-		'subtotal'
+		'subtotal',
+		'notes'
 	];
 
 	public function product()
